@@ -44,6 +44,9 @@ void kernel_main(void)
     printf("\n\nHello %s with printf!\n\n", "World");
     printf("\n\n1 + 2 = %d, %x\n\n", 1 + 2, 0x1234abcd);
 
+    PANIC("booted!");
+    printf("unreachable here!\n");
+
     for (;;)
     {
         __asm__ __volatile__("wfi");
