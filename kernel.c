@@ -3,7 +3,10 @@
 
 // Linker Script (kernel.ld) で定義した変数を使える。
 extern char __bss[], __bss_end[], __stack_top[], __free_ram[], __free_ram_end[];
+
 struct process procs[PROCS_MAX];
+struct process *current_proc; // 現在実行中のプロセス
+struct process *idle_proc;    // アイドルプロセス (実行可能なプロセスがないときに実行するプロセス)
 
 __attribute__((naked)) void switch_context(uint32_t *prev_sp,
                                            uint32_t *next_sp)
@@ -45,6 +48,39 @@ __attribute__((naked)) void switch_context(uint32_t *prev_sp,
         "lw s11, 12 * 4(sp)\n"
         "addi sp, sp, 13 * 4\n"
         "ret\n");
+}
+
+// 他のプロセスにCPU時間という資源を”譲る”
+void yield(void)
+{
+    // 実行可能なプロセスを探す
+    struct process *next = idle_proc;
+    for (int i = 0; i < PROCS_MAX; ++i)
+    {
+        int next_proc_idx = (current_proc->pid + i) % PROCS_MAX;
+        struct process *proc = &procs[next_proc_idx];
+        if (proc->state == PROC_RUNNABLE && proc->pid > 0)
+        {
+            next = proc;
+            break;
+        }
+    }
+
+    // 現在実行中のプロセス以外に実行可能なプロセスが無い
+    if (next == current_proc)
+    {
+        return;
+    }
+
+    __asm__ __volatile__(
+        "csrw sscratch %[sscratch]\n" // sscratch <- %[sscratch](大体a0)
+        :
+        : [sscratch] "r"((uint32_t)&next->stack[sizeof(next->stack)]));
+
+    // コンテキストスイッチ
+    struct process *prev = current_proc;
+    current_proc = next;
+    switch_context(&prev->sp, &next->sp);
 }
 
 struct process *create_process(uint32_t pc)
@@ -140,12 +176,15 @@ void handle_trap(struct trap_frame *f)
     PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n", scause, stval, user_pc);
 }
 
+// 例外発生時のJump先
 __attribute__((naked))
 __attribute__((aligned(4))) //
 void kernel_entry(void)
 {
     __asm__ __volatile__(
-        "csrw sscratch, sp\n"
+        // 実行中プロセスのカーネルスタックをsscratchから取り出す (spとsscratchのswap)
+        "csrrw sp, sscratch, sp\n"
+
         "addi sp, sp, -4 * 31\n"
         "sw ra,  4 * 0(sp)\n"
         "sw gp,  4 * 1(sp)\n"
@@ -178,11 +217,16 @@ void kernel_entry(void)
         "sw s10, 4 * 28(sp)\n"
         "sw s11, 4 * 29(sp)\n"
 
+        // 例外発生時のspを取り出して保存
         "csrr a0, sscratch\n"
         "sw a0, 4 * 30(sp)\n"
 
+        // カーネルスタックを設定し直す
+        "addi a0, sp, 4 * 31\n"
+        "csrw sscratch, a0\n"
+
         "mv a0, sp\n"
-        "call handle_trap\n"
+        "call handle_trap\n" // handle_trap()
 
         "lw ra,  4 * 0(sp)\n"
         "lw gp,  4 * 1(sp)\n"
@@ -235,7 +279,7 @@ void proc_a_entry(void)
     while (1)
     {
         putchar('A');
-        switch_context(&proc_a->sp, &proc_b->sp);
+        yield();
         delay();
     }
 }
@@ -246,7 +290,7 @@ void proc_b_entry(void)
     while (1)
     {
         putchar('b');
-        switch_context(&proc_b->sp, &proc_a->sp);
+        yield();
         delay();
     }
 }
@@ -258,8 +302,16 @@ void kernel_main(void)
 
     WRITE_CSR(stvec, (uint32_t)kernel_entry); // 不具合が起きたときのJump先を登録
 
+    idle_proc = create_process((uint32_t)NULL);
+    idle_proc->pid = 0; // idle
+    current_proc = idle_proc;
+
     proc_a = create_process((uint32_t)proc_a_entry);
     proc_b = create_process((uint32_t)proc_b_entry);
+
+    yield();
+    PANIC("switched to idle process");
+
     proc_a_entry();
 
     PANIC("unreachable here!");
@@ -269,23 +321,6 @@ void kernel_main(void)
     ///
     ///
 
-    const char *s = "\n\nHello World!\n";
-    for (int i = 0; s[i] != '\0'; i++)
-    {
-        putchar(s[i]);
-    }
-
-    printf("\n\nHello %s with printf!\n\n", "World");
-    printf("\n\n1 + 2 = %d, %x\n\n", 1 + 2, 0x1234abcd);
-
-    paddr_t paddr0 = alloc_pages(2);
-    paddr_t paddr1 = alloc_pages(1);
-    printf("alloc_pages test: paddr0=%x\n", paddr0);
-    printf("alloc_pages test: paddr1=%x\n", paddr1);
-
-    PANIC("booted!");
-
-    WRITE_CSR(stvec, (uint32_t)kernel_entry);
     __asm__ __volatile__("unimp"); // 無効な命令でPANIC
 
     for (;;)
