@@ -1,6 +1,13 @@
 #pragma once
 #include "common.h"
 
+#define SATP_SV32 (1u << 31) // 「Sv32モードでページングを有効化すること」を示すsatpレジスタのビット
+#define PAGE_V (1 << 0)      // 有効化ビット
+#define PAGE_R (1 << 1)      // 読み込み可能
+#define PAGE_W (1 << 2)      // 書き込み可能
+#define PAGE_X (1 << 3)      // 実行可能
+#define PAGE_U (1 << 4)      // ユーザモードでアクセス可能
+
 struct trap_frame
 {
     uint32_t ra;
@@ -77,8 +84,9 @@ struct sbiret
 // プロセス管理構造体 (Process Control Block)
 struct process
 {
-    int pid;             // プロセスID
-    int state;           // プロセスの状態 (PROC_UNUSED or PROC_RUNNABLE)
-    vaddr_t sp;          // コンテキストスイッチ時のスタックポインタ
+    int pid;    // プロセスID
+    int state;  // プロセスの状態 (PROC_UNUSED or PROC_RUNNABLE)
+    vaddr_t sp; // コンテキストスイッチ時のスタックポインタ
+    uint32_t *page_table;
     uint8_t stack[8192]; // カーネルスタック
 };

@@ -6,7 +6,7 @@ typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 typedef uint32_t size_t;
-typedef uint32_t paddr_t; // 物理メモリアドレスを表す
+typedef uint32_t paddr_t; // 物理メモリアドレスを表す (Physical Address)
 typedef uint32_t vaddr_t; // 仮想メモリアドレスを表す == uintptr_t
 
 #define true 1
