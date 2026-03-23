@@ -39,3 +39,22 @@ C-a C-a  sends C-a
 - `kernel.c` にカーネルのエントリーポイント `boot()` を実装
 - `kernel_main()` にJumpしてそこからはカーネルが自由に処理を実行できる
 - `run.sh` を実行するとカーネルのコンパイルと、QEMU上での起動が行われる
+
+## 2026-03-22
+
+### 生バイナリ
+
+ベースアドレスから実際にメモリ上に展開される内容が入ったもの。
+今回は簡単のために生バイナリを使う。
+
+一般的なOSでは、以下2つは分かれた形式を使う。
+
+- 展開先の定義 (elf相当)
+- メモリ上のデータ
+
+### addr2line
+
+```sh
+$ ls /usr/bin/llvm-addr2line*
+/usr/bin/llvm-addr2line-11  /usr/bin/llvm-addr2line-14
+```

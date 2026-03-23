@@ -1,12 +1,15 @@
 #pragma once
 #include "common.h"
 
+#define USER_BASE 0x1000000
+
 #define SATP_SV32 (1u << 31) // 「Sv32モードでページングを有効化すること」を示すsatpレジスタのビット
 #define PAGE_V (1 << 0)      // 有効化ビット
 #define PAGE_R (1 << 1)      // 読み込み可能
 #define PAGE_W (1 << 2)      // 書き込み可能
 #define PAGE_X (1 << 3)      // 実行可能
 #define PAGE_U (1 << 4)      // ユーザモードでアクセス可能
+#define SSTATUS_SPIE (1 << 5)
 
 struct trap_frame
 {
