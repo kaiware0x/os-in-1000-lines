@@ -57,7 +57,7 @@ void printf(const char *fmt, ...)
     {
         if (*fmt == '%')
         {
-            fmt++;
+            fmt++; // 次の文字へ進む
             switch (*fmt)
             {
             case '\0':        // % が文字列の末尾だったとき
